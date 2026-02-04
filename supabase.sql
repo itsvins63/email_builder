@@ -93,31 +93,37 @@ create policy "profiles_read" on public.profiles
   for select to authenticated
   using (true);
 
--- templates: owner can do anything
-create policy "templates_owner_select" on public.templates
-  for select to authenticated
-  using (owner_id = auth.uid() or exists (
-    select 1 from public.template_shares s
-    where s.template_id = id and s.shared_with = auth.uid()
-  ));
+-- Helper to check sharing without triggering RLS recursion
+create or replace function public.has_template_share(tid uuid, required_role text default null)
+returns boolean
+language sql
+security definer
+set search_path = public, auth
+as $$
+  select exists(
+    select 1
+    from public.template_shares s
+    where s.template_id = tid
+      and s.shared_with = auth.uid()
+      and (required_role is null or s.role = required_role)
+  );
+$$;
 
-create policy "templates_owner_insert" on public.templates
+-- templates: access = owner OR shared; edit = owner OR shared as editor
+create policy "templates_select" on public.templates
+  for select to authenticated
+  using (owner_id = auth.uid() or public.has_template_share(id, null));
+
+create policy "templates_insert" on public.templates
   for insert to authenticated
   with check (owner_id = auth.uid());
 
-create policy "templates_owner_update" on public.templates
+create policy "templates_update" on public.templates
   for update to authenticated
-  using (
-    owner_id = auth.uid() or exists (
-      select 1 from public.template_shares s
-      where s.template_id = id and s.shared_with = auth.uid() and s.role = 'editor'
-    )
-  )
-  with check (
-    owner_id = owner_id
-  );
+  using (owner_id = auth.uid() or public.has_template_share(id, 'editor'))
+  with check (true);
 
-create policy "templates_owner_delete" on public.templates
+create policy "templates_delete" on public.templates
   for delete to authenticated
   using (owner_id = auth.uid());
 
@@ -155,22 +161,12 @@ create policy "shares_delete_owner" on public.template_shares
 -- versions: readable if template readable; insertable if editor/owner
 create policy "versions_select" on public.template_versions
   for select to authenticated
-  using (exists (
-    select 1 from public.templates t
-    where t.id = template_id
-      and (t.owner_id = auth.uid() or exists (
-        select 1 from public.template_shares s
-        where s.template_id = t.id and s.shared_with = auth.uid()
-      ))
-  ));
+  using (
+    public.is_template_owner(template_id) or public.has_template_share(template_id, null)
+  );
 
 create policy "versions_insert" on public.template_versions
   for insert to authenticated
-  with check (exists (
-    select 1 from public.templates t
-    where t.id = template_id
-      and (t.owner_id = auth.uid() or exists (
-        select 1 from public.template_shares s
-        where s.template_id = t.id and s.shared_with = auth.uid() and s.role = 'editor'
-      ))
-  ));
+  with check (
+    public.is_template_owner(template_id) or public.has_template_share(template_id, 'editor')
+  );
