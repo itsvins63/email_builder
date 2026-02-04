@@ -1,14 +1,12 @@
-name: ui-screenshots
+name: ui-screenshots (deprecated)
 
 on:
-  push:
-    branches: [ main ]
   workflow_dispatch: {}
 
 jobs:
   screenshots:
     runs-on: ubuntu-latest
-    timeout-minutes: 15
+    timeout-minutes: 20
     steps:
       - uses: actions/checkout@v4
 
@@ -17,35 +15,18 @@ jobs:
           node-version: 22
           cache: npm
 
-      - name: Install deps
-        run: npm ci
+      - run: npm ci
 
       - name: Install Playwright (Chromium)
         run: npx playwright install --with-deps chromium
 
-      - name: Run Playwright screenshots
-        run: |
-          rm -rf playwright-artifacts
-          mkdir -p playwright-artifacts
-          npx playwright test
+      - name: Run Playwright (visual + e2e)
+        run: npx playwright test
 
-      - name: Upload screenshots artifact
-        uses: actions/upload-artifact@v4
+      - uses: actions/upload-artifact@v4
+        if: always()
         with:
-          name: ui-screenshots
-          path: playwright-artifacts
-
-      - name: Send screenshots to Telegram
-        if: ${{ secrets.TELEGRAM_BOT_TOKEN != '' && secrets.TELEGRAM_CHAT_ID != '' }}
-        env:
-          TELEGRAM_BOT_TOKEN: ${{ secrets.TELEGRAM_BOT_TOKEN }}
-          TELEGRAM_CHAT_ID: ${{ secrets.TELEGRAM_CHAT_ID }}
-        run: |
-          for f in playwright-artifacts/*.png; do
-            echo "Sending $f"
-            curl -sS -X POST "https://api.telegram.org/bot${TELEGRAM_BOT_TOKEN}/sendPhoto" \
-              -F chat_id="${TELEGRAM_CHAT_ID}" \
-              -F photo="@${f}" \
-              -F caption="ui-screenshots: ${GITHUB_SHA:0:7} / ${f##*/}" \
-              >/dev/null
-          done
+          name: playwright-report
+          path: |
+            playwright-report
+            test-results

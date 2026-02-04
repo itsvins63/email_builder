@@ -30,9 +30,16 @@ export async function middleware(request: NextRequest) {
   })
 
   // Refresh auth session
-  const {
-    data: { user },
-  } = await supabase.auth.getUser()
+  // In dev/CI, Supabase may be unreachable; treat failures as unauthenticated.
+  let user: Awaited<ReturnType<typeof supabase.auth.getUser>>['data']['user'] = null
+  try {
+    const {
+      data: { user: u },
+    } = await supabase.auth.getUser()
+    user = u
+  } catch {
+    user = null
+  }
 
   const isProtected = request.nextUrl.pathname.startsWith('/templates')
 

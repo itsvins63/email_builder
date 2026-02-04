@@ -1,0 +1,91 @@
+name: ci
+
+on:
+  pull_request:
+  push:
+    branches: [main]
+
+jobs:
+  unit:
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+      - run: npm ci
+      - run: npm run test:unit
+
+  e2e:
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    strategy:
+      fail-fast: false
+      matrix:
+        project: [chromium-desktop, chromium-mobile]
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+      - run: npm ci
+      - name: Install Playwright (Chromium)
+        run: npx playwright install --with-deps chromium
+      - name: Run Playwright (visual + e2e)
+        env:
+          # Optional: point to staging/local Supabase. Middleware tolerates unreachable supabase.
+          NEXT_PUBLIC_SUPABASE_URL: ${{ secrets.NEXT_PUBLIC_SUPABASE_URL }}
+          NEXT_PUBLIC_SUPABASE_ANON_KEY: ${{ secrets.NEXT_PUBLIC_SUPABASE_ANON_KEY }}
+        run: npx playwright test --project ${{ matrix.project }}
+      - uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: playwright-${{ matrix.project }}
+          path: |
+            test-results
+            playwright-report
+
+  supabase-rls:
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+      - run: npm ci
+
+      # Local Supabase via CLI + Docker
+      - uses: supabase/setup-cli@v1
+        with:
+          version: latest
+
+      - name: Start Supabase
+        run: supabase start
+
+      - name: Reset DB (apply migrations)
+        run: supabase db reset
+
+      - name: Export local keys
+        id: keys
+        shell: bash
+        run: |
+          echo "SUPABASE_URL=http://127.0.0.1:54321" >> $GITHUB_ENV
+          # Extract keys from supabase status output
+          STATUS=$(supabase status)
+          echo "$STATUS"
+          ANON=$(echo "$STATUS" | sed -n 's/.*anon key: \(.*\)$/\1/p' | tail -n 1)
+          SRK=$(echo "$STATUS" | sed -n 's/.*service_role key: \(.*\)$/\1/p' | tail -n 1)
+          echo "SUPABASE_ANON_KEY=$ANON" >> $GITHUB_ENV
+          echo "SUPABASE_SERVICE_ROLE_KEY=$SRK" >> $GITHUB_ENV
+
+      - name: Run RLS integration tests
+        run: npm run test:integration
+
+      - name: Stop Supabase
+        if: always()
+        run: supabase stop

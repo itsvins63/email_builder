@@ -37,6 +37,46 @@ npm run dev
 - Add the same env vars in Vercel project settings
 - Deploy
 
+## Testing
+
+### Unit tests (Vitest + React Testing Library)
+
+```bash
+npm run test:unit
+# or
+npm run test:watch
+```
+
+### E2E + visual regression (Playwright)
+
+```bash
+npm run e2e
+
+# First run / when intentionally changing UI:
+npm run e2e:update
+```
+
+Playwright visual baselines live next to the spec files in `tests/**.spec.ts-snapshots/`.
+
+### Supabase / RLS integration tests
+
+These tests validate core RLS behavior (owner vs viewer vs editor). They run when the following env vars are present:
+
+- `SUPABASE_URL`
+- `SUPABASE_ANON_KEY`
+- `SUPABASE_SERVICE_ROLE_KEY`
+
+Local Supabase (recommended):
+
+```bash
+supabase start
+supabase db reset
+SUPABASE_URL=http://127.0.0.1:54321 \
+SUPABASE_ANON_KEY=<from supabase status> \
+SUPABASE_SERVICE_ROLE_KEY=<from supabase status> \
+  npm run test:integration
+```
+
 ## Notes
 
 Sharing by email requires the recipient to have signed in at least once (so they exist in `public.profiles`).
