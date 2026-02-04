@@ -1,0 +1,166 @@
+-- Email Builder schema (Supabase)
+-- Run this in Supabase SQL Editor.
+
+-- Extensions
+create extension if not exists "pgcrypto";
+
+-- Profiles: public mirror of auth users for sharing-by-email
+create table if not exists public.profiles (
+  id uuid primary key references auth.users(id) on delete cascade,
+  email text unique not null,
+  created_at timestamptz not null default now()
+);
+
+create or replace function public.handle_new_user()
+returns trigger
+language plpgsql
+security definer
+as $$
+begin
+  insert into public.profiles (id, email)
+  values (new.id, new.email)
+  on conflict (id) do update set email = excluded.email;
+  return new;
+end;
+$$;
+
+drop trigger if exists on_auth_user_created on auth.users;
+create trigger on_auth_user_created
+  after insert or update of email on auth.users
+  for each row execute procedure public.handle_new_user();
+
+-- Templates
+create table if not exists public.templates (
+  id uuid primary key default gen_random_uuid(),
+  owner_id uuid not null references auth.users(id) on delete cascade,
+  name text not null,
+  current_design_json jsonb,
+  current_html text,
+  created_at timestamptz not null default now(),
+  updated_at timestamptz not null default now()
+);
+
+create index if not exists templates_owner_id_idx on public.templates(owner_id);
+
+create or replace function public.set_updated_at()
+returns trigger
+language plpgsql
+as $$
+begin
+  new.updated_at = now();
+  return new;
+end;
+$$;
+
+drop trigger if exists templates_set_updated_at on public.templates;
+create trigger templates_set_updated_at
+  before update on public.templates
+  for each row execute procedure public.set_updated_at();
+
+-- Sharing
+create table if not exists public.template_shares (
+  template_id uuid not null references public.templates(id) on delete cascade,
+  shared_with uuid not null references auth.users(id) on delete cascade,
+  role text not null check (role in ('viewer','editor')),
+  created_at timestamptz not null default now(),
+  primary key (template_id, shared_with)
+);
+
+create index if not exists template_shares_shared_with_idx on public.template_shares(shared_with);
+
+-- Versions
+create table if not exists public.template_versions (
+  id uuid primary key default gen_random_uuid(),
+  template_id uuid not null references public.templates(id) on delete cascade,
+  version int not null,
+  saved_by uuid references auth.users(id) on delete set null,
+  design_json jsonb,
+  html text,
+  created_at timestamptz not null default now(),
+  unique (template_id, version)
+);
+
+create index if not exists template_versions_template_id_idx on public.template_versions(template_id);
+
+-- RLS
+alter table public.profiles enable row level security;
+alter table public.templates enable row level security;
+alter table public.template_shares enable row level security;
+alter table public.template_versions enable row level security;
+
+-- profiles: any authenticated user can read profiles for sharing-by-email
+create policy "profiles_read" on public.profiles
+  for select to authenticated
+  using (true);
+
+-- templates: owner can do anything
+create policy "templates_owner_select" on public.templates
+  for select to authenticated
+  using (owner_id = auth.uid() or exists (
+    select 1 from public.template_shares s
+    where s.template_id = id and s.shared_with = auth.uid()
+  ));
+
+create policy "templates_owner_insert" on public.templates
+  for insert to authenticated
+  with check (owner_id = auth.uid());
+
+create policy "templates_owner_update" on public.templates
+  for update to authenticated
+  using (
+    owner_id = auth.uid() or exists (
+      select 1 from public.template_shares s
+      where s.template_id = id and s.shared_with = auth.uid() and s.role = 'editor'
+    )
+  )
+  with check (
+    owner_id = owner_id
+  );
+
+create policy "templates_owner_delete" on public.templates
+  for delete to authenticated
+  using (owner_id = auth.uid());
+
+-- template_shares: shared users can see rows about templates shared with them; only owner can manage
+create policy "shares_select" on public.template_shares
+  for select to authenticated
+  using (
+    shared_with = auth.uid() or exists (
+      select 1 from public.templates t where t.id = template_id and t.owner_id = auth.uid()
+    )
+  );
+
+create policy "shares_insert_owner" on public.template_shares
+  for insert to authenticated
+  with check (exists (
+    select 1 from public.templates t where t.id = template_id and t.owner_id = auth.uid()
+  ));
+
+create policy "shares_delete_owner" on public.template_shares
+  for delete to authenticated
+  using (exists (
+    select 1 from public.templates t where t.id = template_id and t.owner_id = auth.uid()
+  ));
+
+-- versions: readable if template readable; insertable if editor/owner
+create policy "versions_select" on public.template_versions
+  for select to authenticated
+  using (exists (
+    select 1 from public.templates t
+    where t.id = template_id
+      and (t.owner_id = auth.uid() or exists (
+        select 1 from public.template_shares s
+        where s.template_id = t.id and s.shared_with = auth.uid()
+      ))
+  ));
+
+create policy "versions_insert" on public.template_versions
+  for insert to authenticated
+  with check (exists (
+    select 1 from public.templates t
+    where t.id = template_id
+      and (t.owner_id = auth.uid() or exists (
+        select 1 from public.template_shares s
+        where s.template_id = t.id and s.shared_with = auth.uid() and s.role = 'editor'
+      ))
+  ));

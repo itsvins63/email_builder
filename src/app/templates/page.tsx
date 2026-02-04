@@ -2,211 +2,194 @@
 
 import Link from 'next/link'
 import { useEffect, useMemo, useState } from 'react'
-import { useAuth } from '@/components/AuthProvider'
-import { supabase } from '@/lib/supabaseClient'
+import { createClient } from '@/lib/supabase/browser'
 import type { Template } from '@/lib/types'
 
-function classNames(...xs: Array<string | false | undefined>) {
-  return xs.filter(Boolean).join(' ')
+type SharedTemplateRow = {
+  template: Template
+  role: 'viewer' | 'editor'
 }
 
 export default function TemplatesPage() {
-  const { user, loading } = useAuth()
-  const [myTemplates, setMyTemplates] = useState<Template[]>([])
-  const [sharedTemplates, setSharedTemplates] = useState<Template[]>([])
-  const [busy, setBusy] = useState(false)
-  const [name, setName] = useState('')
-  const disabled = useMemo(() => loading || !user || busy, [loading, user, busy])
+  const supabase = useMemo(() => createClient(), [])
+  const [tab, setTab] = useState<'mine' | 'shared'>('mine')
+  const [loading, setLoading] = useState(true)
+  const [error, setError] = useState<string | null>(null)
+  const [mine, setMine] = useState<Template[]>([])
+  const [shared, setShared] = useState<SharedTemplateRow[]>([])
 
   async function load() {
-    if (!user) return
+    setLoading(true)
+    setError(null)
 
-    // My templates
-    const mine = await supabase()
+    const {
+      data: { user },
+      error: userErr,
+    } = await supabase.auth.getUser()
+
+    if (userErr) {
+      setError(userErr.message)
+      setLoading(false)
+      return
+    }
+
+    if (!user) {
+      setError('Not signed in')
+      setLoading(false)
+      return
+    }
+
+    const myRes = await supabase
       .from('templates')
       .select('*')
       .order('updated_at', { ascending: false })
 
-    if (!mine.error) setMyTemplates((mine.data as Template[]) ?? [])
+    if (myRes.error) {
+      setError(myRes.error.message)
+      setLoading(false)
+      return
+    }
 
-    // Shared with me (via view)
-    const shared = await supabase()
-      .from('templates_shared_with_me')
-      .select('*')
-      .order('updated_at', { ascending: false })
+    const sharedRes = await supabase
+      .from('template_shares')
+      .select('role, template:templates(*)')
+      .order('created_at', { ascending: false })
 
-    if (!shared.error) setSharedTemplates((shared.data as Template[]) ?? [])
+    if (sharedRes.error) {
+      setError(sharedRes.error.message)
+      setLoading(false)
+      return
+    }
+
+    setMine((myRes.data as Template[]) || [])
+    setShared((sharedRes.data as any) || [])
+    setLoading(false)
   }
 
   useEffect(() => {
-    if (!loading && user) load()
-  }, [loading, user])
+    load()
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [])
 
   async function createTemplate() {
+    const name = prompt('Template name?')
+    if (!name) return
+
+    const {
+      data: { user },
+    } = await supabase.auth.getUser()
     if (!user) return
-    if (!name.trim()) return
 
-    setBusy(true)
-    try {
-      const { data, error } = await supabase()
-        .from('templates')
-        .insert({ name: name.trim(), owner_id: user.id })
-        .select('*')
-        .single()
+    const { data, error } = await supabase
+      .from('templates')
+      .insert({ name, owner_id: user.id })
+      .select('*')
+      .single()
 
-      if (error) throw error
-      setName('')
-      await load()
-      if (data?.id) {
-        // Go straight into editor
-        window.location.href = `/templates/${data.id}`
-      }
-    } finally {
-      setBusy(false)
+    if (error) {
+      alert(error.message)
+      return
     }
-  }
 
-  async function deleteTemplate(id: string) {
-    if (!confirm('Delete this template?')) return
-    setBusy(true)
-    try {
-      const { error } = await supabase().from('templates').delete().eq('id', id)
-      if (error) throw error
-      await load()
-    } finally {
-      setBusy(false)
-    }
+    setMine((prev) => [data as Template, ...prev])
   }
 
   async function signOut() {
-    setBusy(true)
-    try {
-      await supabase().auth.signOut()
-      window.location.href = '/'
-    } finally {
-      setBusy(false)
-    }
-  }
-
-  if (!loading && !user) {
-    return (
-      <main className="min-h-screen p-10">
-        <div className="mx-auto max-w-2xl space-y-4">
-          <h1 className="text-2xl font-semibold">Templates</h1>
-          <p className="text-gray-600">You need to sign in first.</p>
-          <Link className="rounded bg-black px-4 py-2 text-white" href="/login">
-            Go to login
-          </Link>
-        </div>
-      </main>
-    )
+    await supabase.auth.signOut()
+    window.location.href = '/login'
   }
 
   return (
-    <main className="min-h-screen p-10">
-      <div className="mx-auto max-w-4xl space-y-8">
-        <header className="flex items-center justify-between gap-4">
-          <div>
-            <h1 className="text-2xl font-semibold">Templates</h1>
-            <p className="text-sm text-gray-600">
-              Signed in as <span className="font-mono">{user?.email}</span>
-            </p>
-          </div>
-          <button className="rounded border px-3 py-2" onClick={signOut}>
+    <main className="mx-auto max-w-5xl p-8">
+      <div className="flex items-center justify-between">
+        <h1 className="text-2xl font-semibold">Templates</h1>
+        <div className="flex gap-2">
+          <button
+            onClick={createTemplate}
+            className="rounded bg-black px-3 py-2 text-sm text-white"
+          >
+            New
+          </button>
+          <button
+            onClick={signOut}
+            className="rounded border px-3 py-2 text-sm"
+          >
             Sign out
           </button>
-        </header>
-
-        <section className="space-y-3">
-          <h2 className="text-lg font-medium">Create template</h2>
-          <div className="flex flex-col gap-2 sm:flex-row">
-            <input
-              className="w-full rounded border px-3 py-2"
-              placeholder="Template name"
-              value={name}
-              onChange={(e) => setName(e.target.value)}
-              disabled={disabled}
-            />
-            <button
-              className={classNames(
-                'rounded bg-black px-4 py-2 text-white',
-                disabled && 'opacity-50'
-              )}
-              onClick={createTemplate}
-              disabled={disabled}
-            >
-              Create
-            </button>
-          </div>
-        </section>
-
-        <section className="space-y-3">
-          <h2 className="text-lg font-medium">My templates</h2>
-          <div className="grid gap-3">
-            {myTemplates.map((t) => (
-              <div
-                key={t.id}
-                className="flex items-center justify-between rounded border p-3"
-              >
-                <div>
-                  <div className="font-medium">{t.name}</div>
-                  <div className="text-xs text-gray-500">
-                    Updated {new Date(t.updated_at).toLocaleString()}
-                  </div>
-                </div>
-                <div className="flex gap-2">
-                  <Link
-                    className="rounded border px-3 py-2"
-                    href={`/templates/${t.id}`}
-                  >
-                    Open
-                  </Link>
-                  <button
-                    className="rounded border px-3 py-2"
-                    onClick={() => deleteTemplate(t.id)}
-                    disabled={busy}
-                  >
-                    Delete
-                  </button>
-                </div>
-              </div>
-            ))}
-            {!myTemplates.length && (
-              <p className="text-sm text-gray-600">No templates yet.</p>
-            )}
-          </div>
-        </section>
-
-        <section className="space-y-3">
-          <h2 className="text-lg font-medium">Shared with me</h2>
-          <div className="grid gap-3">
-            {sharedTemplates.map((t) => (
-              <div
-                key={t.id}
-                className="flex items-center justify-between rounded border p-3"
-              >
-                <div>
-                  <div className="font-medium">{t.name}</div>
-                  <div className="text-xs text-gray-500">
-                    Updated {new Date(t.updated_at).toLocaleString()}
-                  </div>
-                </div>
-                <div className="flex gap-2">
-                  <Link
-                    className="rounded border px-3 py-2"
-                    href={`/templates/${t.id}`}
-                  >
-                    Open
-                  </Link>
-                </div>
-              </div>
-            ))}
-            {!sharedTemplates.length && (
-              <p className="text-sm text-gray-600">Nothing shared with you.</p>
-            )}
-          </div>
-        </section>
+        </div>
       </div>
+
+      <div className="mt-6 flex gap-2 text-sm">
+        <button
+          onClick={() => setTab('mine')}
+          className={`rounded px-3 py-1 ${tab === 'mine' ? 'bg-black text-white' : 'border'}`}
+        >
+          My templates
+        </button>
+        <button
+          onClick={() => setTab('shared')}
+          className={`rounded px-3 py-1 ${tab === 'shared' ? 'bg-black text-white' : 'border'}`}
+        >
+          Shared with me
+        </button>
+        <button onClick={load} className="ml-auto rounded border px-3 py-1">
+          Refresh
+        </button>
+      </div>
+
+      {loading ? (
+        <p className="mt-6 text-sm text-muted-foreground">Loading…</p>
+      ) : error ? (
+        <p className="mt-6 text-sm text-red-600">{error}</p>
+      ) : tab === 'mine' ? (
+        <ul className="mt-6 grid gap-3">
+          {mine.map((t) => (
+            <li key={t.id} className="rounded border p-4">
+              <div className="flex items-center justify-between gap-4">
+                <div>
+                  <div className="font-medium">{t.name}</div>
+                  <div className="text-xs text-muted-foreground">
+                    Updated: {new Date(t.updated_at).toLocaleString()}
+                  </div>
+                </div>
+                <Link
+                  className="rounded border px-3 py-2 text-sm"
+                  href={`/templates/${t.id}/edit`}
+                >
+                  Edit
+                </Link>
+              </div>
+            </li>
+          ))}
+          {mine.length === 0 ? (
+            <li className="text-sm text-muted-foreground">No templates yet.</li>
+          ) : null}
+        </ul>
+      ) : (
+        <ul className="mt-6 grid gap-3">
+          {shared.map((row) => (
+            <li key={row.template.id} className="rounded border p-4">
+              <div className="flex items-center justify-between gap-4">
+                <div>
+                  <div className="font-medium">{row.template.name}</div>
+                  <div className="text-xs text-muted-foreground">
+                    Role: {row.role}
+                  </div>
+                </div>
+                <Link
+                  className="rounded border px-3 py-2 text-sm"
+                  href={`/templates/${row.template.id}/edit`}
+                >
+                  Open
+                </Link>
+              </div>
+            </li>
+          ))}
+          {shared.length === 0 ? (
+            <li className="text-sm text-muted-foreground">Nothing shared yet.</li>
+          ) : null}
+        </ul>
+      )}
     </main>
   )
 }

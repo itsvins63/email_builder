@@ -1,130 +1,75 @@
 'use client'
 
+import 'grapesjs/dist/css/grapes.min.css'
+
+import grapesjs, { type Editor } from 'grapesjs'
 import { useEffect, useRef } from 'react'
-import type grapesjs from 'grapesjs'
-import type { ProjectData } from 'grapesjs'
 
-export type GrapesInstance = ReturnType<typeof grapesjs.init>
-
-export type GrapesEditorProps = {
-  initialProjectData: ProjectData | null
-  onReady?: (editor: GrapesInstance) => void
+type Props = {
+  initialProjectData?: any
+  onReady?: (editor: Editor) => void
 }
 
-export default function GrapesEditor({ initialProjectData, onReady }: GrapesEditorProps) {
+export default function GrapesEditor({ initialProjectData, onReady }: Props) {
   const elRef = useRef<HTMLDivElement | null>(null)
-  const editorRef = useRef<GrapesInstance | null>(null)
+  const editorRef = useRef<Editor | null>(null)
 
   useEffect(() => {
-    let destroyed = false
+    if (!elRef.current) return
+    if (editorRef.current) return
 
-    async function start() {
-      if (!elRef.current) return
-      if (editorRef.current) return
+    const editor = grapesjs.init({
+      container: elRef.current,
+      height: 'calc(100vh - 160px)',
+      fromElement: false,
+      storageManager: false,
+      panels: { defaults: [] },
+    })
 
-      const grapes = (await import('grapesjs')).default
+    // Minimal blocks for email-like layouts
+    const bm = editor.BlockManager
+    bm.add('section', {
+      label: 'Section',
+      content:
+        '<section style="padding:20px;"><div style="max-width:600px;margin:0 auto;"></div></section>',
+    })
+    bm.add('text', {
+      label: 'Text',
+      content: '<p style="font-family:Arial; font-size:14px;">Your text here</p>',
+    })
+    bm.add('button', {
+      label: 'Button',
+      content:
+        '<a href="#" style="display:inline-block;background:#111;color:#fff;padding:12px 16px;border-radius:6px;text-decoration:none;font-family:Arial;">Button</a>',
+    })
+    bm.add('image', {
+      label: 'Image',
+      content: '<img alt="" src="https://placehold.co/600x200" style="max-width:100%;"/>',
+    })
 
-      // Basic blocks for email-ish HTML.
-      const editor = grapes.init({
-        container: elRef.current,
-        height: 'calc(100vh - 140px)',
-        fromElement: false,
-        storageManager: false,
-        selectorManager: { componentFirst: true },
-        blockManager: {
-          appendTo: '#gjs-blocks',
-          blocks: [
-            {
-              id: 'section',
-              label: 'Section',
-              content: '<section style="padding:20px;"></section>',
-            },
-            {
-              id: 'text',
-              label: 'Text',
-              content: '<div style="font-family:Arial, sans-serif; font-size:14px;">Text</div>',
-            },
-            {
-              id: 'button',
-              label: 'Button',
-              content:
-                '<a href="#" style="display:inline-block;padding:10px 16px;background:#111;color:#fff;text-decoration:none;border-radius:6px;">Button</a>',
-            },
-            {
-              id: 'image',
-              label: 'Image',
-              content: '<img alt="" style="max-width:100%;" />',
-            },
-          ],
-        },
-        panels: {
-          defaults: [
-            {
-              id: 'basic-actions',
-              el: '.panel__basic-actions',
-              buttons: [
-                {
-                  id: 'undo',
-                  className: 'btn-undo',
-                  label: 'Undo',
-                  command: 'core:undo',
-                },
-                {
-                  id: 'redo',
-                  className: 'btn-redo',
-                  label: 'Redo',
-                  command: 'core:redo',
-                },
-                {
-                  id: 'clean-all',
-                  className: 'btn-clean-all',
-                  label: 'Clear',
-                  command: 'core:canvas-clear',
-                },
-              ],
-            },
-          ],
-        },
-      })
+    editor.Panels.addPanel({
+      id: 'basic-actions',
+      el: '.gjs-pn-panels',
+      buttons: [],
+    })
 
-      if (initialProjectData) {
-        try {
-          editor.loadProjectData(initialProjectData)
-        } catch {
-          // ignore
-        }
+    if (initialProjectData) {
+      try {
+        editor.loadProjectData(initialProjectData)
+      } catch {
+        // ignore invalid data
       }
-
-      if (destroyed) {
-        editor.destroy()
-        return
-      }
-
-      editorRef.current = editor
-      onReady?.(editor)
     }
 
-    start()
+    editorRef.current = editor
+    onReady?.(editor)
 
     return () => {
-      destroyed = true
-      if (editorRef.current) {
-        editorRef.current.destroy()
-        editorRef.current = null
-      }
+      editorRef.current?.destroy()
+      editorRef.current = null
     }
-  }, [initialProjectData, onReady])
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [])
 
-  return (
-    <div className="grid grid-cols-1 gap-3 md:grid-cols-[280px_1fr]">
-      <div className="rounded border p-3">
-        <div className="mb-2 text-sm font-medium">Blocks</div>
-        <div id="gjs-blocks" />
-      </div>
-      <div className="rounded border">
-        <div className="panel__basic-actions flex gap-2 border-b p-2 text-sm" />
-        <div ref={elRef} />
-      </div>
-    </div>
-  )
+  return <div ref={elRef} />
 }
