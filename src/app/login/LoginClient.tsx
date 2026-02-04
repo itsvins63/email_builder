@@ -29,21 +29,16 @@ export default function LoginClient() {
   }
 
   return (
-    <main className="mx-auto flex max-w-md flex-col gap-4 p-8">
-      <h1 className="text-xl font-semibold">Sign in</h1>
-      <p className="text-sm text-muted-foreground">
-        Use Google to sign in. Any Google account is allowed.
-      </p>
-
+    <div className="grid gap-3">
       <button
         onClick={signInWithGoogle}
         disabled={loading}
-        className="rounded bg-black px-4 py-2 text-white disabled:opacity-60"
+        className="inline-flex items-center justify-center rounded-xl bg-blue-600 px-4 py-2 text-sm font-medium text-white hover:bg-blue-700 disabled:opacity-60"
       >
         {loading ? 'Redirecting…' : 'Continue with Google'}
       </button>
 
       {error ? <p className="text-sm text-red-600">{error}</p> : null}
-    </main>
+    </div>
   )
 }
