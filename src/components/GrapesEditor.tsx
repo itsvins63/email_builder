@@ -3,7 +3,7 @@
 import 'grapesjs/dist/css/grapes.min.css'
 
 import grapesjs, { type Editor, type ProjectData } from 'grapesjs'
-import { useEffect, useMemo, useRef, useState, type ReactElement } from 'react'
+import { useEffect, useRef, useState, type ReactElement } from 'react'
 import { CardButton } from '@/components/ui'
 import {
   ButtonIcon,
@@ -49,11 +49,6 @@ export default function GrapesEditor({ initialProjectData, onReady }: Props) {
   const rightTraitsRef = useRef<HTMLDivElement | null>(null)
 
   const [tab, setTab] = useState<RightTab>('styles')
-
-  const canInit = useMemo(
-    () => Boolean(canvasRef.current && leftBlocksRef.current),
-    [],
-  )
 
   useEffect(() => {
     if (!canvasRef.current) return
@@ -158,7 +153,7 @@ export default function GrapesEditor({ initialProjectData, onReady }: Props) {
       editorRef.current = null
     }
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [canInit])
+  }, [])
 
   function addBlock(id: string) {
     const ed = editorRef.current
