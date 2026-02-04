@@ -246,7 +246,28 @@ export default function EditTemplatePage() {
           </div>
         </div>
 
-        <div className="flex gap-2">
+        <div className="flex flex-wrap gap-2">
+          <button
+            onClick={() => editor?.runCommand('preview')}
+            className="rounded border px-3 py-2 text-sm"
+            disabled={!editor}
+          >
+            Preview
+          </button>
+          <button
+            onClick={() => editor?.setDevice('Desktop')}
+            className="rounded border px-3 py-2 text-sm"
+            disabled={!editor}
+          >
+            Desktop
+          </button>
+          <button
+            onClick={() => editor?.setDevice('Mobile')}
+            className="rounded border px-3 py-2 text-sm"
+            disabled={!editor}
+          >
+            Mobile
+          </button>
           <button onClick={exportHtml} className="rounded border px-3 py-2 text-sm">
             Copy HTML
           </button>

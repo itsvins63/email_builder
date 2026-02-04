@@ -61,6 +61,19 @@ export default function GrapesEditor({ initialProjectData, onReady }: Props) {
       fromElement: false,
       storageManager: false,
       panels: { defaults: [] },
+      deviceManager: {
+        devices: [
+          { id: 'Desktop', name: 'Desktop', width: '' },
+          { id: 'Mobile', name: 'Mobile', width: '375px' },
+        ],
+      },
+      canvas: {
+        styles: [
+          'body{margin:0;background:#f6f7fb;font-family:Arial, sans-serif;}',
+          '.email-root{max-width:700px;margin:24px auto;background:#fff;box-shadow:0 1px 2px rgba(0,0,0,.06);border:1px solid #e5e7eb;min-height:600px;}',
+          '.email-pad{padding:20px;}',
+        ],
+      },
       blockManager: { appendTo: leftBlocksRef.current },
       layerManager: { appendTo: rightLayersRef.current || undefined },
       selectorManager: { appendTo: rightStylesRef.current || undefined },
@@ -94,19 +107,26 @@ export default function GrapesEditor({ initialProjectData, onReady }: Props) {
       traitManager: { appendTo: rightTraitsRef.current || undefined },
     })
 
-    // Keep email-ish background like the reference (wait for iframe/document)
-    editor.on('load', () => {
-      const doc = editor.Canvas.getDocument()
-      if (doc?.body) doc.body.style.background = '#f6f7fb'
-    })
+    // Background handled via canvas.styles
 
     // Blocks
     const bm = editor.BlockManager
+    // Ensure a visible email body container
+    editor.on('load', () => {
+      const wrapper = editor.getWrapper()
+      if (!wrapper?.components()?.length) {
+        editor.setComponents(
+          '<div class="email-root"><div class="email-pad"><p style="font-size:14px;">Start building…</p></div></div>',
+        )
+      }
+      editor.setDevice('Desktop')
+    })
+
     bm.add('section', {
       label: 'Section',
       category: 'Layout',
       content:
-        '<section style="padding:20px;"><div style="max-width:600px;margin:0 auto;background:#fff;padding:16px;"></div></section>',
+        '<section class="email-pad"><div style="max-width:700px;margin:0 auto;"></div></section>',
     })
     bm.add('2col', {
       label: '2 Columns',
@@ -194,8 +214,8 @@ export default function GrapesEditor({ initialProjectData, onReady }: Props) {
       </div>
 
       {/* Center: Canvas */}
-      <div className="min-w-0 flex-1 p-6">
-        <div className="mx-auto h-full max-w-[980px] rounded bg-white shadow-sm">
+      <div className="min-w-0 flex-1 p-3">
+        <div className="h-full w-full rounded bg-white shadow-sm">
           <div ref={canvasRef} className="h-full" />
         </div>
       </div>
