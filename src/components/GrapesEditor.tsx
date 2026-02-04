@@ -94,8 +94,11 @@ export default function GrapesEditor({ initialProjectData, onReady }: Props) {
       traitManager: { appendTo: rightTraitsRef.current || undefined },
     })
 
-    // Keep email-ish width / background like the reference
-    editor.Canvas.getDocument().body.style.background = '#f6f7fb'
+    // Keep email-ish background like the reference (wait for iframe/document)
+    editor.on('load', () => {
+      const doc = editor.Canvas.getDocument()
+      if (doc?.body) doc.body.style.background = '#f6f7fb'
+    })
 
     // Blocks
     const bm = editor.BlockManager
