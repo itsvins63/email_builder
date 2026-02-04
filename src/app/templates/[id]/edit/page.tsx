@@ -288,7 +288,7 @@ export default function EditTemplatePage() {
       ) : error ? (
         <div className="mx-auto mt-6 max-w-6xl text-sm text-red-600">{error}</div>
       ) : (
-        <div className="mx-auto mt-4 grid max-w-6xl grid-cols-1 gap-4 lg:grid-cols-[1fr_320px]">
+        <div className="mx-auto mt-4 grid max-w-6xl grid-cols-1 gap-4">
           <div className="rounded border">
             <GrapesEditor
               initialProjectData={template?.current_design_json || undefined}
@@ -296,7 +296,7 @@ export default function EditTemplatePage() {
             />
           </div>
 
-          <aside className="space-y-4">
+          <div className="grid grid-cols-1 gap-4 md:grid-cols-2">
             <section className="rounded border p-3">
               <div className="mb-2 flex items-center justify-between">
                 <div className="text-sm font-medium">Versions</div>
@@ -352,7 +352,7 @@ export default function EditTemplatePage() {
                 ) : null}
               </ul>
             </section>
-          </aside>
+          </div>
         </div>
       )}
     </main>

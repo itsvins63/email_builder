@@ -70,7 +70,7 @@ export default function GrapesEditor({ initialProjectData, onReady }: Props) {
       canvas: {
         styles: [
           'body{margin:0;background:#f6f7fb;font-family:Arial, sans-serif;}',
-          '.email-root{max-width:700px;margin:24px auto;background:#fff;box-shadow:0 1px 2px rgba(0,0,0,.06);border:1px solid #e5e7eb;min-height:600px;}',
+          '.email-root{max-width:920px;margin:16px auto;background:#fff;box-shadow:0 1px 2px rgba(0,0,0,.06);border:1px solid #e5e7eb;min-height:640px;}',
           '.email-pad{padding:20px;}',
         ],
       },
@@ -214,7 +214,7 @@ export default function GrapesEditor({ initialProjectData, onReady }: Props) {
       </div>
 
       {/* Center: Canvas */}
-      <div className="min-w-0 flex-1 p-3">
+      <div className="min-w-0 flex-1 p-2">
         <div className="h-full w-full rounded bg-white shadow-sm">
           <div ref={canvasRef} className="h-full" />
         </div>
