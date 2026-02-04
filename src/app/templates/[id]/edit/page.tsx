@@ -24,7 +24,7 @@ type ShareRow = {
 }
 
 export default function EditTemplatePage() {
-  const supabase = useMemo(() => createClient(), [])
+  const [supabase, setSupabase] = useState<ReturnType<typeof createClient> | null>(null)
   const params = useParams<{ id: string }>()
   const id = params.id
   const router = useRouter()
@@ -42,6 +42,7 @@ export default function EditTemplatePage() {
   const [shares, setShares] = useState<ShareRow[]>([])
 
   async function loadAll() {
+    if (!supabase) return
     setLoading(true)
     setError(null)
 
@@ -105,11 +106,18 @@ export default function EditTemplatePage() {
   }
 
   useEffect(() => {
+    // Avoid creating Supabase client during SSR/build prerender
+    setSupabase(createClient())
+  }, [])
+
+  useEffect(() => {
+    if (!supabase) return
     loadAll()
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [id])
+  }, [id, supabase])
 
   async function save() {
+    if (!supabase) return
     if (!editor || !template) return
     if (!canEdit) {
       alert('You only have view access.')
@@ -172,6 +180,7 @@ export default function EditTemplatePage() {
   }
 
   async function addShare() {
+    if (!supabase) return
     if (!template) return
     const email = prompt('Share with which email? (User must have logged in once)')
     if (!email) return
@@ -203,6 +212,7 @@ export default function EditTemplatePage() {
   }
 
   async function removeShare(sharedWith: string) {
+    if (!supabase) return
     if (!confirm('Remove access?')) return
     const { error } = await supabase
       .from('template_shares')

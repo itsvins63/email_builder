@@ -11,7 +11,7 @@ type SharedTemplateRow = {
 }
 
 export default function TemplatesPage() {
-  const supabase = useMemo(() => createClient(), [])
+  const [supabase, setSupabase] = useState<ReturnType<typeof createClient> | null>(null)
   const [tab, setTab] = useState<'mine' | 'shared'>('mine')
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState<string | null>(null)
@@ -19,6 +19,7 @@ export default function TemplatesPage() {
   const [shared, setShared] = useState<SharedTemplateRow[]>([])
 
   async function load() {
+    if (!supabase) return
     setLoading(true)
     setError(null)
 
@@ -67,11 +68,18 @@ export default function TemplatesPage() {
   }
 
   useEffect(() => {
-    load()
-    // eslint-disable-next-line react-hooks/exhaustive-deps
+    // Avoid creating Supabase client during SSR/build prerender
+    setSupabase(createClient())
   }, [])
 
+  useEffect(() => {
+    if (!supabase) return
+    load()
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [supabase])
+
   async function createTemplate() {
+    if (!supabase) return
     const name = prompt('Template name?')
     if (!name) return
 
@@ -95,6 +103,7 @@ export default function TemplatesPage() {
   }
 
   async function signOut() {
+    if (!supabase) return
     await supabase.auth.signOut()
     window.location.href = '/login'
   }
