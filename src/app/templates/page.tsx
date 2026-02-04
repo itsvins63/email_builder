@@ -95,7 +95,8 @@ export default function TemplatesPage() {
       .single()
 
     if (error) {
-      alert(error.message)
+      const { toast } = await import('sonner')
+      toast.error('Create failed', { description: error.message })
       return
     }
 
@@ -108,25 +109,59 @@ export default function TemplatesPage() {
     window.location.href = '/login'
   }
 
+  async function renameTemplate(id: string, current: string) {
+    if (!supabase) return
+    const name = prompt('New name', current)
+    if (!name || name === current) return
+
+    const { error } = await supabase.from('templates').update({ name }).eq('id', id)
+    if (error) {
+      const { toast } = await import('sonner')
+      toast.error('Rename failed', { description: error.message })
+      return
+    }
+    setMine((prev) => prev.map((t) => (t.id === id ? { ...t, name } : t)))
+  }
+
+  async function deleteTemplate(id: string) {
+    if (!supabase) return
+    if (!confirm('Delete this template?')) return
+
+    const { error } = await supabase.from('templates').delete().eq('id', id)
+    if (error) {
+      const { toast } = await import('sonner')
+      toast.error('Delete failed', { description: error.message })
+      return
+    }
+    setMine((prev) => prev.filter((t) => t.id !== id))
+  }
+
   return (
-    <main className="mx-auto max-w-5xl p-8">
-      <div className="flex items-center justify-between">
-        <h1 className="text-2xl font-semibold">Templates</h1>
-        <div className="flex gap-2">
-          <button
-            onClick={createTemplate}
-            className="rounded bg-black px-3 py-2 text-sm text-white"
-          >
-            New
-          </button>
-          <button
-            onClick={signOut}
-            className="rounded border px-3 py-2 text-sm"
-          >
-            Sign out
-          </button>
+    <main className="min-h-screen bg-slate-50">
+      <div className="mx-auto max-w-6xl px-6 py-8">
+        <div className="flex flex-wrap items-center justify-between gap-3">
+          <div>
+            <h1 className="text-2xl font-semibold tracking-tight">Templates</h1>
+            <p className="mt-1 text-sm text-slate-600">
+              Your templates are private by default. Share from inside an editor.
+            </p>
+          </div>
+
+          <div className="flex gap-2">
+            <button
+              onClick={createTemplate}
+              className="rounded-lg bg-blue-600 px-3 py-2 text-sm font-medium text-white hover:bg-blue-700"
+            >
+              New template
+            </button>
+            <button
+              onClick={signOut}
+              className="rounded-lg border bg-white px-3 py-2 text-sm hover:bg-slate-50"
+            >
+              Sign out
+            </button>
+          </div>
         </div>
-      </div>
 
       <div className="mt-6 flex gap-2 text-sm">
         <button
@@ -151,54 +186,78 @@ export default function TemplatesPage() {
       ) : error ? (
         <p className="mt-6 text-sm text-red-600">{error}</p>
       ) : tab === 'mine' ? (
-        <ul className="mt-6 grid gap-3">
+        <div className="mt-6 grid grid-cols-1 gap-4 md:grid-cols-2 lg:grid-cols-3">
           {mine.map((t) => (
-            <li key={t.id} className="rounded border p-4">
-              <div className="flex items-center justify-between gap-4">
-                <div>
-                  <div className="font-medium">{t.name}</div>
-                  <div className="text-xs text-muted-foreground">
-                    Updated: {new Date(t.updated_at).toLocaleString()}
+            <div
+              key={t.id}
+              className="rounded-xl border bg-white p-4 shadow-sm"
+            >
+              <div className="flex items-start justify-between gap-3">
+                <div className="min-w-0">
+                  <div className="truncate font-medium">{t.name}</div>
+                  <div className="mt-1 text-xs text-slate-500">
+                    Updated {new Date(t.updated_at).toLocaleString()}
                   </div>
                 </div>
+                <div className="flex gap-1">
+                  <button
+                    onClick={() => renameTemplate(t.id, t.name)}
+                    className="rounded-md border bg-white px-2 py-1 text-xs hover:bg-slate-50"
+                  >
+                    Rename
+                  </button>
+                  <button
+                    onClick={() => deleteTemplate(t.id)}
+                    className="rounded-md border bg-white px-2 py-1 text-xs hover:bg-slate-50"
+                  >
+                    Delete
+                  </button>
+                </div>
+              </div>
+
+              <div className="mt-4">
                 <Link
-                  className="rounded border px-3 py-2 text-sm"
+                  className="inline-flex w-full items-center justify-center rounded-lg bg-slate-900 px-3 py-2 text-sm font-medium text-white hover:bg-slate-950"
                   href={`/templates/${t.id}/edit`}
                 >
-                  Edit
+                  Open editor
                 </Link>
               </div>
-            </li>
+            </div>
           ))}
+
           {mine.length === 0 ? (
-            <li className="text-sm text-muted-foreground">No templates yet.</li>
+            <div className="rounded-xl border bg-white p-6 text-sm text-slate-600">
+              No templates yet. Click <b>New template</b> to create one.
+            </div>
           ) : null}
-        </ul>
+        </div>
       ) : (
-        <ul className="mt-6 grid gap-3">
+        <div className="mt-6 grid grid-cols-1 gap-4 md:grid-cols-2 lg:grid-cols-3">
           {shared.map((row) => (
-            <li key={row.template.id} className="rounded border p-4">
-              <div className="flex items-center justify-between gap-4">
-                <div>
-                  <div className="font-medium">{row.template.name}</div>
-                  <div className="text-xs text-muted-foreground">
-                    Role: {row.role}
-                  </div>
-                </div>
+            <div key={row.template.id} className="rounded-xl border bg-white p-4 shadow-sm">
+              <div className="min-w-0">
+                <div className="truncate font-medium">{row.template.name}</div>
+                <div className="mt-1 text-xs text-slate-500">Role: {row.role}</div>
+              </div>
+              <div className="mt-4">
                 <Link
-                  className="rounded border px-3 py-2 text-sm"
+                  className="inline-flex w-full items-center justify-center rounded-lg border bg-white px-3 py-2 text-sm font-medium hover:bg-slate-50"
                   href={`/templates/${row.template.id}/edit`}
                 >
                   Open
                 </Link>
               </div>
-            </li>
+            </div>
           ))}
           {shared.length === 0 ? (
-            <li className="text-sm text-muted-foreground">Nothing shared yet.</li>
+            <div className="rounded-xl border bg-white p-6 text-sm text-slate-600">
+              Nothing shared with you yet.
+            </div>
           ) : null}
-        </ul>
+        </div>
       )}
+      </div>
     </main>
   )
 }
