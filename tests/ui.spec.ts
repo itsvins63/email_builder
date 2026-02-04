@@ -1,6 +1,12 @@
 import { test } from '@playwright/test'
 
-async function snap(page: any, path: string, url: string, width: number, height: number) {
+async function snap(
+  page: import('@playwright/test').Page,
+  path: string,
+  url: string,
+  width: number,
+  height: number,
+) {
   await page.setViewportSize({ width, height })
   await page.goto(url)
   await page.waitForTimeout(1500)

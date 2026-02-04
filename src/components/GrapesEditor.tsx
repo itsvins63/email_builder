@@ -3,18 +3,8 @@
 import 'grapesjs/dist/css/grapes.min.css'
 
 import grapesjs, { type Editor, type ProjectData } from 'grapesjs'
-import { useEffect, useRef, useState, type ReactElement } from 'react'
-import { CardButton } from '@/components/ui'
-import {
-  ButtonIcon,
-  DividerIcon,
-  ImageIcon,
-  LayersIcon,
-  LayoutIcon,
-  SlidersIcon,
-  TagIcon,
-  TextIcon,
-} from '@/components/icons'
+import { useEffect, useRef, useState } from 'react'
+import { LayersIcon, SlidersIcon, TagIcon } from '@/components/icons'
 
 type Props = {
   initialProjectData?: unknown
@@ -22,21 +12,6 @@ type Props = {
 }
 
 type RightTab = 'layers' | 'styles' | 'traits'
-
-type BlockTile = {
-  id: string
-  title: string
-  icon: ReactElement
-}
-
-const BLOCK_TILES: BlockTile[] = [
-  { id: 'text', title: 'Text', icon: <TextIcon /> },
-  { id: 'image', title: 'Image', icon: <ImageIcon /> },
-  { id: 'button', title: 'Button', icon: <ButtonIcon /> },
-  { id: 'divider', title: 'Divider', icon: <DividerIcon /> },
-  { id: 'section', title: 'Section', icon: <LayoutIcon /> },
-  { id: '2col', title: '2 Columns', icon: <LayoutIcon /> },
-]
 
 export default function GrapesEditor({ initialProjectData, onReady }: Props) {
   const editorRef = useRef<Editor | null>(null)
@@ -107,10 +82,9 @@ export default function GrapesEditor({ initialProjectData, onReady }: Props) {
       traitManager: { appendTo: rightTraitsRef.current || undefined },
     })
 
-    // Background handled via canvas.styles
-
     // Blocks
     const bm = editor.BlockManager
+
     // Ensure a visible email body container
     editor.on('load', () => {
       const wrapper = editor.getWrapper()
@@ -120,15 +94,48 @@ export default function GrapesEditor({ initialProjectData, onReady }: Props) {
         )
       }
       editor.setDevice('Desktop')
+
+      // Make categories collapsible (accordion)
+      const root = leftBlocksRef.current
+      if (!root) return
+
+      // Collapse all categories by default, expand the first
+      const categories = Array.from(
+        root.querySelectorAll<HTMLElement>('.gjs-block-category'),
+      )
+
+      categories.forEach((cat, idx) => {
+        cat.classList.toggle('oc-cat-collapsed', idx !== 0)
+        const title =
+          cat.querySelector<HTMLElement>('.gjs-title') ||
+          cat.querySelector<HTMLElement>('.gjs-category-title') ||
+          cat.querySelector<HTMLElement>('[class*="title"]')
+
+        const t = title as HTMLElement & { __oc_bound?: boolean }
+        if (t && !t.__oc_bound) {
+          t.__oc_bound = true
+          t.style.cursor = 'pointer'
+          t.addEventListener('click', () => {
+            cat.classList.toggle('oc-cat-collapsed')
+          })
+        }
+      })
     })
 
-    bm.add('section', {
+    // Layout
+    bm.add('layout_section', {
       label: 'Section',
       category: 'Layout',
       content:
-        '<section class="email-pad"><div style="max-width:700px;margin:0 auto;"></div></section>',
+        '<section class="email-pad"><div style="max-width:920px;margin:0 auto;"></div></section>',
     })
-    bm.add('2col', {
+    bm.add('layout_container', {
+      label: 'Container',
+      category: 'Layout',
+      content:
+        '<div style="max-width:920px;margin:0 auto;border:1px dashed #ddd;padding:16px;">Container</div>',
+    })
+    bm.add('layout_2col', {
       label: '2 Columns',
       category: 'Layout',
       content: `
@@ -138,26 +145,85 @@ export default function GrapesEditor({ initialProjectData, onReady }: Props) {
         </div>
       `,
     })
-    bm.add('text', {
+    bm.add('layout_3col', {
+      label: '3 Columns',
+      category: 'Layout',
+      content: `
+        <div style="display:flex; gap:12px;">
+          <div style="flex:1; padding:12px; border:1px dashed #ddd;">Col</div>
+          <div style="flex:1; padding:12px; border:1px dashed #ddd;">Col</div>
+          <div style="flex:1; padding:12px; border:1px dashed #ddd;">Col</div>
+        </div>
+      `,
+    })
+
+    // Basic
+    bm.add('basic_heading', {
+      label: 'Heading',
+      category: 'Basic',
+      content:
+        '<h2 style="font-family:Arial; font-size:24px; margin:0 0 12px;">Heading</h2>',
+    })
+    bm.add('basic_text', {
       label: 'Text',
       category: 'Basic',
       content: '<p style="font-family:Arial; font-size:14px;">Your text here</p>',
     })
-    bm.add('button', {
+    bm.add('basic_button', {
       label: 'Button',
       category: 'Basic',
       content:
-        '<a href="#" style="display:inline-block;background:#111;color:#fff;padding:12px 16px;border-radius:6px;text-decoration:none;font-family:Arial;">Button</a>',
+        '<a href="#" style="display:inline-block;background:#111;color:#fff;padding:12px 16px;border-radius:10px;text-decoration:none;font-family:Arial;">Button</a>',
     })
-    bm.add('image', {
+    bm.add('basic_image', {
       label: 'Image',
       category: 'Basic',
-      content: '<img alt="" src="https://placehold.co/600x200" style="max-width:100%;"/>',
+      content:
+        '<img alt="" src="https://placehold.co/920x300" style="max-width:100%;border-radius:12px;"/>',
     })
-    bm.add('divider', {
+    bm.add('basic_divider', {
       label: 'Divider',
       category: 'Basic',
       content: '<hr style="border:none;border-top:1px solid #e5e5e5;"/>',
+    })
+    bm.add('basic_spacer', {
+      label: 'Spacer',
+      category: 'Basic',
+      content: '<div style="height:24px;"></div>',
+    })
+
+    // Content
+    bm.add('content_list', {
+      label: 'List',
+      category: 'Content',
+      content:
+        '<ul style="font-family:Arial; font-size:14px; padding-left:18px;"><li>Item one</li><li>Item two</li><li>Item three</li></ul>',
+    })
+    bm.add('content_quote', {
+      label: 'Quote',
+      category: 'Content',
+      content:
+        '<blockquote style="border-left:4px solid #e5e7eb;padding-left:12px;margin:0;color:#334155;font-family:Arial;">A short quote.</blockquote>',
+    })
+
+    // Social
+    bm.add('social_row', {
+      label: 'Social',
+      category: 'Social',
+      content: `
+        <div style="display:flex; gap:10px; align-items:center;">
+          <a href="#" style="display:inline-block;width:28px;height:28px;border-radius:8px;background:#111;color:#fff;text-align:center;line-height:28px;font-family:Arial;">in</a>
+          <a href="#" style="display:inline-block;width:28px;height:28px;border-radius:8px;background:#111;color:#fff;text-align:center;line-height:28px;font-family:Arial;">X</a>
+          <a href="#" style="display:inline-block;width:28px;height:28px;border-radius:8px;background:#111;color:#fff;text-align:center;line-height:28px;font-family:Arial;">f</a>
+        </div>
+      `,
+    })
+
+    // Advanced
+    bm.add('advanced_html', {
+      label: 'HTML',
+      category: 'Advanced',
+      content: '<div><!-- Custom HTML --></div>',
     })
 
     if (initialProjectData) {
@@ -178,39 +244,16 @@ export default function GrapesEditor({ initialProjectData, onReady }: Props) {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [])
 
-  function addBlock(id: string) {
-    const ed = editorRef.current
-    if (!ed) return
-    const block = ed.BlockManager.get(id)
-    if (!block) return
-    // Insert block content into canvas
-    const content = block.get('content')
-    if (content) ed.addComponents(content)
-  }
-
   return (
     <div className="flex h-[calc(100vh-220px)] min-h-[600px] w-full min-w-0 border bg-slate-50">
       {/* Left: Elements */}
-      <div className="w-[260px] shrink-0 border-r bg-white">
+      <div className="w-[300px] shrink-0 border-r bg-white">
         <div className="flex items-center justify-between border-b px-3 py-2">
           <div className="text-sm font-medium">Elements</div>
+          <div className="text-xs text-slate-500">Drag into canvas</div>
         </div>
 
-        <div className="p-3">
-          <div className="grid grid-cols-3 gap-2">
-            {BLOCK_TILES.map((t) => (
-              <CardButton
-                key={t.id}
-                title={t.title}
-                icon={t.icon}
-                onClick={() => addBlock(t.id)}
-              />
-            ))}
-          </div>
-        </div>
-
-        {/* Hidden Grapes block list (kept for internal registrations) */}
-        <div ref={leftBlocksRef} className="hidden" />
+        <div ref={leftBlocksRef} className="gjs-left-blocks h-full overflow-auto p-3" />
       </div>
 
       {/* Center: Canvas */}
