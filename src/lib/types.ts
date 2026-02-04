@@ -2,7 +2,7 @@ export type Template = {
   id: string
   owner_id: string
   name: string
-  current_design_json: any
+  current_design_json: unknown
   current_html: string | null
   created_at: string
   updated_at: string

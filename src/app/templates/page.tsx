@@ -1,7 +1,7 @@
 'use client'
 
 import Link from 'next/link'
-import { useEffect, useMemo, useState } from 'react'
+import { useEffect, useState } from 'react'
 import { createClient } from '@/lib/supabase/browser'
 import type { Template } from '@/lib/types'
 
@@ -63,7 +63,7 @@ export default function TemplatesPage() {
     }
 
     setMine((myRes.data as Template[]) || [])
-    setShared((sharedRes.data as any) || [])
+    setShared((sharedRes.data as unknown as SharedTemplateRow[]) || [])
     setLoading(false)
   }
 

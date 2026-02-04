@@ -1,6 +1,6 @@
 'use client'
 
-import { useEffect, useMemo, useState } from 'react'
+import { useEffect, useState } from 'react'
 import { useParams, useRouter } from 'next/navigation'
 import type { Editor } from 'grapesjs'
 import GrapesEditor from '@/components/GrapesEditor'
@@ -46,11 +46,13 @@ export default function EditTemplatePage() {
     setLoading(true)
     setError(null)
 
-    const { data: templateRes, error: tErr } = await supabase
+    const { data: templateResRaw, error: tErr } = await supabase
       .from('templates')
       .select('*')
       .eq('id', id)
       .single()
+
+    const templateRes = templateResRaw as unknown as Template
 
     if (tErr) {
       setError(tErr.message)
@@ -58,13 +60,13 @@ export default function EditTemplatePage() {
       return
     }
 
-    setTemplate(templateRes as Template)
+    setTemplate(templateRes)
 
     const {
       data: { user },
     } = await supabase.auth.getUser()
 
-    const isOwner = Boolean(user?.id && user.id === (templateRes as any).owner_id)
+    const isOwner = Boolean(user?.id && user.id === templateRes.owner_id)
     setIsOwner(isOwner)
 
     // If not owner, check share role
@@ -76,7 +78,8 @@ export default function EditTemplatePage() {
         .eq('template_id', id)
         .eq('shared_with', user.id)
         .maybeSingle()
-      shareRole = (shareRes?.role as any) || null
+      const r = shareRes?.role
+      shareRole = r === 'viewer' || r === 'editor' ? r : null
     }
 
     setCanEdit(Boolean(isOwner || shareRole === 'editor'))
@@ -88,7 +91,7 @@ export default function EditTemplatePage() {
       .order('version', { ascending: false })
       .limit(20)
 
-    setVersions((vRes as any) || [])
+    setVersions((vRes as unknown as VersionRow[]) || [])
 
     if (isOwner) {
       const { data: sRes } = await supabase
@@ -97,7 +100,7 @@ export default function EditTemplatePage() {
         .eq('template_id', id)
         .order('created_at', { ascending: false })
 
-      setShares((sRes as any) || [])
+      setShares((sRes as unknown as ShareRow[]) || [])
     } else {
       setShares([])
     }
@@ -184,7 +187,8 @@ export default function EditTemplatePage() {
     if (!template) return
     const email = prompt('Share with which email? (User must have logged in once)')
     if (!email) return
-    const role = (prompt('Role? viewer/editor', 'viewer') as any) || 'viewer'
+    const roleInput = prompt('Role? viewer/editor', 'viewer') || 'viewer'
+    const role: 'viewer' | 'editor' = roleInput === 'editor' ? 'editor' : 'viewer'
 
     const { data: profileRes, error: pErr } = await supabase
       .from('profiles')

@@ -1,6 +1,6 @@
 'use client'
 
-import { useEffect, useState } from 'react'
+import { useState } from 'react'
 import { useSearchParams } from 'next/navigation'
 import { createClient } from '@/lib/supabase/browser'
 
@@ -8,10 +8,6 @@ export default function LoginClient() {
   const [loading, setLoading] = useState(false)
   const [error, setError] = useState<string | null>(null)
   const next = useSearchParams().get('next') || '/templates'
-
-  useEffect(() => {
-    setError(null)
-  }, [])
 
   async function signInWithGoogle() {
     setLoading(true)
