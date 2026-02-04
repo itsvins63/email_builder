@@ -121,26 +121,36 @@ create policy "templates_owner_delete" on public.templates
   for delete to authenticated
   using (owner_id = auth.uid());
 
+-- Helper to avoid RLS recursion when policies reference each other
+-- This function runs with table owner's privileges (bypasses RLS) and safely checks ownership.
+create or replace function public.is_template_owner(tid uuid)
+returns boolean
+language sql
+security definer
+set search_path = public, auth
+as $$
+  select exists(
+    select 1
+    from public.templates t
+    where t.id = tid
+      and t.owner_id = auth.uid()
+  );
+$$;
+
 -- template_shares: shared users can see rows about templates shared with them; only owner can manage
 create policy "shares_select" on public.template_shares
   for select to authenticated
   using (
-    shared_with = auth.uid() or exists (
-      select 1 from public.templates t where t.id = template_id and t.owner_id = auth.uid()
-    )
+    shared_with = auth.uid() or public.is_template_owner(template_id)
   );
 
 create policy "shares_insert_owner" on public.template_shares
   for insert to authenticated
-  with check (exists (
-    select 1 from public.templates t where t.id = template_id and t.owner_id = auth.uid()
-  ));
+  with check (public.is_template_owner(template_id));
 
 create policy "shares_delete_owner" on public.template_shares
   for delete to authenticated
-  using (exists (
-    select 1 from public.templates t where t.id = template_id and t.owner_id = auth.uid()
-  ));
+  using (public.is_template_owner(template_id));
 
 -- versions: readable if template readable; insertable if editor/owner
 create policy "versions_select" on public.template_versions
