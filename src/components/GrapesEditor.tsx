@@ -132,6 +132,98 @@ export default function GrapesEditor({ initialProjectData, onReady }: Props) {
       content:
         '<section class="email-pad"><div style="max-width:920px;margin:0 auto;"></div></section>',
     })
+
+    // Email blocks (reference-style)
+    bm.add('email_header', {
+      label: 'Header',
+      category: 'Email',
+      content: `
+        <div class="email-pad">
+          <div style="display:flex;align-items:center;justify-content:space-between;gap:16px;">
+            <div style="display:flex;align-items:center;gap:10px;">
+              <div style="width:34px;height:34px;border-radius:10px;background:#0f172a;color:#fff;display:flex;align-items:center;justify-content:center;font-family:Arial;font-weight:700;">L</div>
+              <div style="font-family:Arial;font-weight:700;color:#0f172a;">Your Brand</div>
+            </div>
+            <div style="display:flex;gap:14px;font-family:Arial;font-size:13px;color:#334155;">
+              <a href="#" style="color:#334155;text-decoration:none;">Product</a>
+              <a href="#" style="color:#334155;text-decoration:none;">Pricing</a>
+              <a href="#" style="color:#334155;text-decoration:none;">Docs</a>
+            </div>
+          </div>
+        </div>
+      `,
+    })
+
+    bm.add('email_hero', {
+      label: 'Hero',
+      category: 'Email',
+      content: `
+        <div class="email-pad">
+          <div style="border:1px solid #e5e7eb;border-radius:16px;padding:22px;background:#ffffff;">
+            <div style="font-family:Arial;font-size:12px;color:#64748b;">NEW</div>
+            <h1 style="font-family:Arial;font-size:28px;line-height:1.2;margin:10px 0 8px;color:#0f172a;">A short, clear hero headline</h1>
+            <p style="font-family:Arial;font-size:14px;line-height:1.6;margin:0 0 14px;color:#475569;">Use this section to summarize the email and drive a single action.</p>
+            <a href="#" style="display:inline-block;background:#2563eb;color:#fff;padding:12px 16px;border-radius:12px;text-decoration:none;font-family:Arial;font-weight:600;">Primary CTA</a>
+          </div>
+        </div>
+      `,
+    })
+
+    bm.add('email_features_3', {
+      label: 'Features (3)',
+      category: 'Email',
+      content: `
+        <div class="email-pad">
+          <div style="display:flex;gap:12px;">
+            <div style="flex:1;border:1px solid #e5e7eb;border-radius:14px;padding:14px;">
+              <div style="font-family:Arial;font-weight:700;color:#0f172a;">Feature</div>
+              <div style="margin-top:6px;font-family:Arial;font-size:13px;color:#475569;">Describe the benefit in one line.</div>
+            </div>
+            <div style="flex:1;border:1px solid #e5e7eb;border-radius:14px;padding:14px;">
+              <div style="font-family:Arial;font-weight:700;color:#0f172a;">Feature</div>
+              <div style="margin-top:6px;font-family:Arial;font-size:13px;color:#475569;">Describe the benefit in one line.</div>
+            </div>
+            <div style="flex:1;border:1px solid #e5e7eb;border-radius:14px;padding:14px;">
+              <div style="font-family:Arial;font-weight:700;color:#0f172a;">Feature</div>
+              <div style="margin-top:6px;font-family:Arial;font-size:13px;color:#475569;">Describe the benefit in one line.</div>
+            </div>
+          </div>
+        </div>
+      `,
+    })
+
+    bm.add('email_cta_band', {
+      label: 'CTA Band',
+      category: 'Email',
+      content: `
+        <div class="email-pad">
+          <div style="border-radius:16px;padding:18px;background:#0f172a;color:#fff;display:flex;align-items:center;justify-content:space-between;gap:16px;">
+            <div>
+              <div style="font-family:Arial;font-weight:700;">Ready to continue?</div>
+              <div style="margin-top:4px;font-family:Arial;font-size:13px;color:#cbd5e1;">One line supporting copy goes here.</div>
+            </div>
+            <a href="#" style="display:inline-block;background:#fff;color:#0f172a;padding:10px 14px;border-radius:12px;text-decoration:none;font-family:Arial;font-weight:700;">Get started</a>
+          </div>
+        </div>
+      `,
+    })
+
+    bm.add('email_footer', {
+      label: 'Footer',
+      category: 'Email',
+      content: `
+        <div class="email-pad">
+          <div style="border-top:1px solid #e5e7eb;padding-top:14px;font-family:Arial;font-size:12px;color:#64748b;">
+            <div style="display:flex;gap:12px;flex-wrap:wrap;">
+              <a href="#" style="color:#64748b;text-decoration:none;">Help</a>
+              <a href="#" style="color:#64748b;text-decoration:none;">Privacy</a>
+              <a href="#" style="color:#64748b;text-decoration:none;">Unsubscribe</a>
+            </div>
+            <div style="margin-top:8px;">© {{year}} Your Company, Address line</div>
+          </div>
+        </div>
+      `,
+    })
     bm.add('layout_container', {
       label: 'Container',
       category: 'Layout',
