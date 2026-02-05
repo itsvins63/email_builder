@@ -1,7 +1,8 @@
 'use client'
 
-import { useEffect, useState } from 'react'
+import { useEffect, useRef, useState } from 'react'
 import { useParams, useRouter } from 'next/navigation'
+import { RelativeTime } from './Topbar'
 import type { Editor } from 'grapesjs'
 import GrapesEditor from '@/components/GrapesEditor'
 import { createClient } from '@/lib/supabase/browser'
@@ -41,6 +42,14 @@ export default function EditTemplatePage() {
   const [versions, setVersions] = useState<VersionRow[]>([])
   const [shares, setShares] = useState<ShareRow[]>([])
 
+  const [nameEditing, setNameEditing] = useState(false)
+  const [nameDraft, setNameDraft] = useState('')
+
+  const [autosaveOn, setAutosaveOn] = useState(true)
+  const [lastSavedAt, setLastSavedAt] = useState<string | null>(null)
+  const autosaveTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null)
+  const autosaveBusyRef = useRef(false)
+
   async function loadAll() {
     if (!supabase) return
     setLoading(true)
@@ -61,6 +70,7 @@ export default function EditTemplatePage() {
     }
 
     setTemplate(templateRes)
+    setNameDraft(templateRes.name)
 
     const {
       data: { user },
@@ -119,6 +129,68 @@ export default function EditTemplatePage() {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [id, supabase])
 
+  // Autosave on changes (debounced)
+  useEffect(() => {
+    if (!editor) return
+    if (!autosaveOn) return
+    if (!canEdit) return
+
+    const handler = () => {
+      if (autosaveTimerRef.current) clearTimeout(autosaveTimerRef.current)
+      autosaveTimerRef.current = setTimeout(() => {
+        autosave()
+      }, 1500)
+    }
+
+    editor.on('update', handler)
+    editor.on('component:update', handler)
+
+    return () => {
+      editor.off('update', handler)
+      editor.off('component:update', handler)
+      if (autosaveTimerRef.current) clearTimeout(autosaveTimerRef.current)
+      autosaveTimerRef.current = null
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [editor, autosaveOn, canEdit, template?.id])
+
+  function buildHtmlFromEditor(ed: Editor) {
+    const html = ed.getHtml()
+    const css = ed.getCss()
+    return `<!doctype html><html><head><style>${css}</style></head><body>${html}</body></html>`
+  }
+
+  async function autosave() {
+    if (!supabase) return
+    if (!editor || !template) return
+    if (!canEdit) return
+    if (autosaveBusyRef.current) return
+
+    autosaveBusyRef.current = true
+
+    try {
+      const project = editor.getProjectData()
+      const combinedHtml = buildHtmlFromEditor(editor)
+
+      const upRes = await supabase
+        .from('templates')
+        .update({ current_design_json: project, current_html: combinedHtml })
+        .eq('id', template.id)
+        .select('*')
+        .single()
+
+      if (upRes.error) throw upRes.error
+
+      setTemplate(upRes.data as Template)
+      setLastSavedAt(new Date().toISOString())
+    } catch (e: unknown) {
+      const msg = e instanceof Error ? e.message : 'Autosave failed'
+      setError(msg)
+    } finally {
+      autosaveBusyRef.current = false
+    }
+  }
+
   async function save() {
     if (!supabase) return
     if (!editor || !template) return
@@ -131,9 +203,7 @@ export default function EditTemplatePage() {
     setError(null)
 
     const project = editor.getProjectData()
-    const html = editor.getHtml()
-    const css = editor.getCss()
-    const combinedHtml = `<!doctype html><html><head><style>${css}</style></head><body>${html}</body></html>`
+    const combinedHtml = buildHtmlFromEditor(editor)
 
     const nextVersion = (versions[0]?.version || 0) + 1
 
@@ -169,15 +239,14 @@ export default function EditTemplatePage() {
     }
 
     setTemplate(upRes.data as Template)
+    setLastSavedAt(new Date().toISOString())
     await loadAll()
     setSaving(false)
   }
 
   async function exportHtml() {
     if (!editor) return
-    const html = editor.getHtml()
-    const css = editor.getCss()
-    const combinedHtml = `<!doctype html><html><head><style>${css}</style></head><body>${html}</body></html>`
+    const combinedHtml = buildHtmlFromEditor(editor)
     await navigator.clipboard.writeText(combinedHtml)
     alert('HTML copied to clipboard')
   }
@@ -229,57 +298,129 @@ export default function EditTemplatePage() {
   }
 
   return (
-    <main className="p-4">
-      <div className="mx-auto flex max-w-6xl items-center justify-between gap-4">
-        <div>
-          <button
-            onClick={() => router.push('/templates')}
-            className="text-sm text-muted-foreground"
-          >
-            ← Back
-          </button>
-          <h1 className="text-xl font-semibold">
-            {template ? template.name : 'Template'}
-          </h1>
-          <div className="text-xs text-muted-foreground">
-            {canEdit ? 'Editable' : 'View only'}
+    <main className="min-h-screen bg-slate-50">
+      <div className="sticky top-0 z-20 border-b bg-white/80 backdrop-blur">
+        <div className="mx-auto flex max-w-6xl items-center justify-between gap-3 px-4 py-3">
+          <div className="flex min-w-0 items-center gap-3">
+            <button
+              onClick={() => router.push('/templates')}
+              className="rounded-lg border bg-white px-3 py-2 text-sm hover:bg-slate-50"
+            >
+              ← Back
+            </button>
+
+            <div className="min-w-0">
+              <div className="flex items-center gap-2">
+                {nameEditing ? (
+                  <input
+                    value={nameDraft}
+                    onChange={(e) => setNameDraft(e.target.value)}
+                    className="w-[320px] max-w-full rounded-lg border px-2 py-1 text-sm"
+                    placeholder="Template name"
+                    autoFocus
+                    onKeyDown={async (e) => {
+                      if (e.key === 'Escape') {
+                        setNameDraft(template?.name || '')
+                        setNameEditing(false)
+                      }
+                      if (e.key === 'Enter') {
+                        e.preventDefault()
+                        if (!supabase || !template || !isOwner) return
+                        const nextName = nameDraft.trim()
+                        if (!nextName) return
+                        const { error } = await supabase
+                          .from('templates')
+                          .update({ name: nextName })
+                          .eq('id', template.id)
+                        if (!error) {
+                          setTemplate({ ...template, name: nextName })
+                          setNameEditing(false)
+                        } else {
+                          setError(error.message)
+                        }
+                      }
+                    }}
+                  />
+                ) : (
+                  <h1 className="truncate text-base font-semibold tracking-tight">
+                    {template ? template.name : 'Template'}
+                  </h1>
+                )}
+
+                {isOwner ? (
+                  <button
+                    className="rounded-md border bg-white px-2 py-1 text-xs hover:bg-slate-50"
+                    onClick={() => setNameEditing((v) => !v)}
+                    title="Rename"
+                  >
+                    ✎
+                  </button>
+                ) : null}
+
+                <span className="text-xs text-slate-500">
+                  {canEdit ? 'Editable' : 'View only'}
+                </span>
+              </div>
+
+              <div className="mt-1 flex items-center gap-3 text-xs text-slate-500">
+                <label className="inline-flex items-center gap-2">
+                  <input
+                    type="checkbox"
+                    checked={autosaveOn}
+                    onChange={(e) => setAutosaveOn(e.target.checked)}
+                    disabled={!canEdit}
+                  />
+                  Autosave
+                </label>
+                {autosaveOn && lastSavedAt ? (
+                  <span>
+                    Last saved <RelativeTime iso={lastSavedAt} />
+                  </span>
+                ) : null}
+              </div>
+            </div>
+          </div>
+
+          <div className="flex flex-wrap items-center justify-end gap-2">
+            <button
+              onClick={() => editor?.runCommand('preview')}
+              className="rounded-lg border bg-white px-3 py-2 text-sm hover:bg-slate-50"
+              disabled={!editor}
+            >
+              Preview
+            </button>
+            <button
+              onClick={() => editor?.setDevice('Desktop')}
+              className="rounded-lg border bg-white px-3 py-2 text-sm hover:bg-slate-50"
+              disabled={!editor}
+            >
+              Desktop
+            </button>
+            <button
+              onClick={() => editor?.setDevice('Mobile')}
+              className="rounded-lg border bg-white px-3 py-2 text-sm hover:bg-slate-50"
+              disabled={!editor}
+            >
+              Mobile
+            </button>
+            <button
+              onClick={exportHtml}
+              className="rounded-lg border bg-white px-3 py-2 text-sm hover:bg-slate-50"
+            >
+              Copy HTML
+            </button>
+            <button
+              onClick={save}
+              disabled={saving || !canEdit}
+              className="rounded-lg bg-blue-600 px-3 py-2 text-sm font-medium text-white hover:bg-blue-700 disabled:opacity-60"
+            >
+              {saving ? 'Saving…' : 'Save version'}
+            </button>
           </div>
         </div>
-
-        <div className="flex flex-wrap gap-2">
-          <button
-            onClick={() => editor?.runCommand('preview')}
-            className="rounded border px-3 py-2 text-sm"
-            disabled={!editor}
-          >
-            Preview
-          </button>
-          <button
-            onClick={() => editor?.setDevice('Desktop')}
-            className="rounded border px-3 py-2 text-sm"
-            disabled={!editor}
-          >
-            Desktop
-          </button>
-          <button
-            onClick={() => editor?.setDevice('Mobile')}
-            className="rounded border px-3 py-2 text-sm"
-            disabled={!editor}
-          >
-            Mobile
-          </button>
-          <button onClick={exportHtml} className="rounded border px-3 py-2 text-sm">
-            Copy HTML
-          </button>
-          <button
-            onClick={save}
-            disabled={saving || !canEdit}
-            className="rounded bg-black px-3 py-2 text-sm text-white disabled:opacity-60"
-          >
-            {saving ? 'Saving…' : 'Save (new version)'}
-          </button>
-        </div>
       </div>
+
+      <div className="mx-auto max-w-6xl px-4 py-4">
 
       {loading ? (
         <div className="mx-auto mt-6 max-w-6xl text-sm text-muted-foreground">
@@ -288,7 +429,7 @@ export default function EditTemplatePage() {
       ) : error ? (
         <div className="mx-auto mt-6 max-w-6xl text-sm text-red-600">{error}</div>
       ) : (
-        <div className="mx-auto mt-4 grid max-w-6xl grid-cols-1 gap-4">
+        <div className="mt-4 grid grid-cols-1 gap-4">
           <div className="rounded border">
             <GrapesEditor
               initialProjectData={template?.current_design_json || undefined}
@@ -355,6 +496,7 @@ export default function EditTemplatePage() {
           </div>
         </div>
       )}
+      </div>
     </main>
   )
 }
