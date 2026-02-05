@@ -99,26 +99,29 @@ export default function GrapesEditor({ initialProjectData, onReady }: Props) {
       const root = leftBlocksRef.current
       if (!root) return
 
-      // Collapse all categories by default, expand the first
+      // Make categories collapsible (but keep expanded by default)
       const categories = Array.from(
         root.querySelectorAll<HTMLElement>('.gjs-block-category'),
       )
 
-      categories.forEach((cat, idx) => {
-        cat.classList.toggle('oc-cat-collapsed', idx !== 0)
-        const title =
+      categories.forEach((cat) => {
+        // Find the title element reliably across GrapesJS versions
+        const titleEl =
           cat.querySelector<HTMLElement>('.gjs-title') ||
+          cat.querySelector<HTMLElement>('.gjs-block-category-title') ||
           cat.querySelector<HTMLElement>('.gjs-category-title') ||
           cat.querySelector<HTMLElement>('[class*="title"]')
 
-        const t = title as HTMLElement & { __oc_bound?: boolean }
-        if (t && !t.__oc_bound) {
-          t.__oc_bound = true
-          t.style.cursor = 'pointer'
-          t.addEventListener('click', () => {
-            cat.classList.toggle('oc-cat-collapsed')
-          })
-        }
+        if (!titleEl) return
+
+        const t = titleEl as HTMLElement & { __oc_bound?: boolean }
+        if (t.__oc_bound) return
+
+        t.__oc_bound = true
+        t.style.cursor = 'pointer'
+        t.addEventListener('click', () => {
+          cat.classList.toggle('oc-cat-collapsed')
+        })
       })
     })
 
